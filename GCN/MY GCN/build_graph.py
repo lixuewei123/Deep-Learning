@@ -2,7 +2,6 @@
 __author__ = 'GIS'
 
 import networkx as nx
-import dgl
 import pandas as pd
 import numpy as np
 import re
@@ -11,7 +10,7 @@ import torch
 
 
 def read_nodes():
-    with open("E:/deep_network/deal_data/regulation data/nodes10w.txt", 'r') as f:
+    with open("E:/lxw_data/GCN/data/nodes10w.txt", 'r') as f:
         nodes_list1 = f.readlines()
     nodes_list2 = []
     for node in nodes_list1:
@@ -21,7 +20,7 @@ def read_nodes():
 
 
 def read_edges():
-    with open("E:/deep_network/deal_data/regulation data/edges36w .txt", 'r') as f:
+    with open("E:/lxw_data/GCN/data/edges36w .txt", 'r') as f:
         edges_list1 = f.readlines()
 
     i = 0
@@ -37,7 +36,21 @@ def read_edges():
     return edges_df
 
 
-def edges_dataframe(nodes, edges_df):
+def edges_dataframe(edges_df):
+    # =================================================================
+    #                       删除孤立节点
+    # =================================================================
+    s1 = list(edges_df[0])
+    s2 = list(edges_df[1])
+    s1.extend(s2)
+    s1 = list(set(s1))  # 去重复
+    nodes = s1  # 更新节点
+    # =================================================================
+    # =================================================================
+    #                       删除名人节点
+    # =================================================================
+
+    # =================================================================
     node_map = {j: i for i, j in enumerate(nodes)}
     e1 = edges_df[0]
     e2 = edges_df[1]
@@ -45,7 +58,8 @@ def edges_dataframe(nodes, edges_df):
     e22 = list(map(node_map.get, e2))
     edges_df[2] = e11
     edges_df[3] = e22
-    return edges_df
+    edges_df = edges_df[edges_df[2]!=edges_df[3]]
+    return edges_df, nodes
 
 
 def build_graph(edges_df, nodes):
@@ -87,6 +101,7 @@ def build_graph_adj(edges_df, nodes):
     #==================================================================
     e1 = edges_df[2]    # 起始边序号
     e2 = edges_df[3]    # 结束边序号
+
     # 计算权重
     # e3 = []
     # for i, j in zip(e1, e2):
@@ -103,7 +118,7 @@ def build_graph_adj(edges_df, nodes):
     edges_df[5] = e3    # 元组表示一条边
     edges_weight = pd.DataFrame(edges_df[5].value_counts())
     edges_weight[1] = edges_weight.index
-    edges_weight[1][0][0]
+
     edges_weight.columns = ['count', 'edge']
     print('权重边', edges_weight.shape)
     e5 = []
@@ -202,7 +217,7 @@ def preprocess_features(features):
 
 
 def get_labels(nodes):
-    df = pd.read_csv("E:/deep_network/deal_data/regulation data/LXW/users40w.csv", sep=',', header=None,
+    df = pd.read_csv("E:/lxw_data/GCN/data/users40w.csv", sep=',', header=None,
                      encoding='utf=8')
     df.columns = ['ID', 'name', 'type', 'url', 'guanzhu', 'fensi', 'weibo', 'xingbie',
                   'address', 'jianjie', 'biaoqian', 'jiaoyu']
@@ -226,7 +241,7 @@ def get_labels(nodes):
 
 
 def other_meta_feature():
-    df = pd.read_csv("E:/deep_network/deal_data/regulation data/LXW/users40w.csv", sep=',', header=None,
+    df = pd.read_csv("E:/lxw_data/GCN/data/users40w.csv", sep=',', header=None,
                      encoding='utf=8')
     df.columns = ['ID', 'name', 'type', 'url', 'guanzhu', 'fensi', 'weibo', 'xingbie', 'address', 'jianjie', 'biaoqian',
                   'jiaoyu']
@@ -260,22 +275,23 @@ def other_meta_feature():
 
 
 def mainly():
-    nodes = read_nodes()
+    # nodes = read_nodes()
     edges_df = read_edges()
-    edges_df = edges_dataframe(nodes, edges_df)
+    edges_df, nodes = edges_dataframe(edges_df)
     # edges_df.to_csv("E:/deep_network/deal_data/regulation data/edges_df.csv", header=None,
     #                 index=False, encoding='utf-8', sep=',')
     adj = build_graph_adj(edges_df, nodes)
     adj = normalize(adj)  # 邻接矩阵--->归一化拉普拉斯矩阵
     # adj = normalize(adj + sp.eye(adj.shape[0]))  # adj + 单位矩阵I 再标准化
+    print(adj.shape)
 
     # 使用位置特征
     # features = get_labels(nodes)
     # features = encode_onehot(features)
     # labels = np.where(features)[1]  # 运行产生标签
-    features = np.load('E:/deep_network/deal_data/regulation data/features.npy')
+    features = np.load('E:/lxw_data/GCN/data/features.npy')
     features = preprocess_features(features)    # 特征矩阵行标准化
-    labels = np.load('E:/deep_network/deal_data/regulation data/label.npy')  # 直接读取
+    labels = np.load('E:/lxw_data/GCN/data/label.npy')  # 直接读取
 
     # 消除部分节点的位置属性测试
     # features = features[0:80000]
@@ -296,6 +312,10 @@ def mainly():
     # features = xingbie
     # features = np.zeros([91669, 34])
     # features = np.concatenate((features, guanzhu, fensi, weibo), axis=1)
+    # 载入doc2vec特征
+    # features_d2v = np.load("E:/lxw_data/GCN/data/d2v_fea.npy")
+    # features = np.concatenate((features, features_d2v), axis=1)
+    # features = features_d2v
     print('特征矩阵', features.shape)
     return adj, features, labels
 
